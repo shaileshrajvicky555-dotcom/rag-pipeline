@@ -1,0 +1,11 @@
+Anthropic is an AI safety company founded in 2021 by Dario Amodei, Daniela Amodei, and others.
+Their flagship AI assistant is Claude, known for being helpful, harmless, and honest.
+
+RAG stands for Retrieval-Augmented Generation. It combines a retriever with a generator.
+The retriever fetches relevant documents. The generator uses those docs to write grounded answers.
+
+LangChain is an open-source framework for building LLM applications.
+It supports chains, agents, tools, memory, and vector store integrations.
+
+ChromaDB is an open-source vector database. It stores and retrieves embeddings efficiently.
+It runs locally and integrates natively with LangChain.
