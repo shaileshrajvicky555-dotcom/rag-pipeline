@@ -9,7 +9,7 @@ import vector from '../embeddings.json' with { type: 'json' };
 //
 const pdfPath = path.join(
   process.cwd(),
-  "data/Shailesh_Personal_Profile_Report.pdf"
+  "data/pdfs/Shailesh_Personal_Profile_Report.pdf"
 )
 
 const loader = new PDFLoader(pdfPath)
