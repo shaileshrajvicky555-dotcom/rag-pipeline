@@ -60,11 +60,46 @@ import { StringOutputParser } from '@langchain/core/output_parsers';
 //     //     .pipe(prompt)
 //     //     .pipe(llm)
 //     //     .pipe(new StringOutputParser())
-//     const ragChainWithSource = RunnableSequence.from([
+// const ragChainWithSource = RunnableSequence.from([
+//     {
+//         context: retriever.pipe(formatDocs),
+//         question: new RunnablePassthrough(),
+//         sourceDocs: retriever
+//     },
+//     {
+//         answer: RunnableSequence.from([
+//             (input) => ({ context: input.context, question: input.question }),
+//             prompt,
+//             llm,
+//             new StringOutputParser()
+//         ]),
+//         source: (input) =>
+//             [...new Map(
+//                 input.sourceDocs.map((doc) => [
+//                     `${doc.metadata.source}-${doc.metadata.loc?.pageNumber}`,
+//                     {
+//                         file: doc.metadata.source?.split("/").pop(), // just the filename
+//                         page: doc.metadata.loc?.pageNumber ?? "N/A",
+//                     },
+//                 ])
+//             ).values()]
+//     }
+// ])
+//     return ragChainWithSource
+// }
+
+
+
+//Streaming data
+
+// For .invoke() — returns { answer, sources }
+// export async function buildRagChain() {
+//     const { retriver, llm, prompt, extractSources, formatDocuments } = await getChainParts();
+//     const ragChain = RunnableSequence.from([
 //         {
-//             context: retriever.pipe(formatDocs),
-//             question: new RunnablePassthrough,
-//             sourceDocs: retriever
+//             context: retriver.pipe(formatDocuments),
+//             question: new RunnablePassthrough(),
+//             source: retriver
 //         },
 //         {
 //             answer: RunnableSequence.from([
@@ -73,25 +108,11 @@ import { StringOutputParser } from '@langchain/core/output_parsers';
 //                 llm,
 //                 new StringOutputParser()
 //             ]),
-//             source: (input) =>
-//                 [...new Map(
-//                     input.sourceDocs.map((doc) => [
-//                         `${doc.metadata.source}-${doc.metadata.loc?.pageNumber}`,
-//                         {
-//                             file: doc.metadata.source?.split("/").pop(), // just the filename
-//                             page: doc.metadata.loc?.pageNumber ?? "N/A",
-//                         },
-//                     ])
-//                 ).values()]
-//         }
+//             source: (input) => extractSources(input.sourceDocs),
+//         },
 //     ])
-
-//     return ragChainWithSource
+//     return ragChain
 // }
-
-
-
-//Streaming data
 
 async function getChainParts() {
 
@@ -112,8 +133,10 @@ async function getChainParts() {
 
     const llm = new ChatGroq({
         apiKey: process.env.GROQ_API_KEY,
-        model: 'openai/gpt-oss-20b',
+        model: 'llama-3.3-70b-versatile',
+        // model: 'openai/gpt-oss-20b',
         temperature: 0,
+        streaming: true,
     })
 
     const prompt = ChatPromptTemplate.fromTemplate(
@@ -144,69 +167,15 @@ async function getChainParts() {
     return { retriver, llm, prompt, extractSources, formatDocuments }
 }
 
-// For .invoke() — returns { answer, sources }
-export async function buildRagChain() {
-    const { retriver, llm, prompt, extractSources, formatDocuments } = await getChainParts();
-    const ragChain = RunnableSequence.from([
-        {
-            context: retriver.pipe(formatDocuments),
-            question: new RunnablePassthrough(),
-            source: retriver
-        },
-        {
-            answer: RunnableSequence.from([
-                (input) => ({ context: input.context, question: input.question }),
-                prompt,
-                llm,
-                new StringOutputParser()
-            ]),
-            source: (input) => extractSources(input.sourceDocs),
-        },
-    ])
-    return ragChain
-}
-
 // For .stream() — streams tokens + sources separately
-
 export async function buildStremingRagChain() {
-    const { retriver, llm, prompt, formatDocs, extractSources } = await getChainParts();
-//      console.log("WE ARE HERE   ")
-//       const retrieveDocs = RunnableLambda.from((question) =>
-//     retriver.getRelevantDocuments(question)
-//   );
-//     const retrivalChain = RunnableSequence.from([
-//         {
-//             context: retrieveDocs.pipe(formatDocs),
-//             question: new RunnablePassthrough(),
-//             sourceDocs: retrieveDocs,   // stash raw docs for metadata
-//         },
+    const { retriver, llm, prompt, formatDocuments, extractSources } = await getChainParts();
 
-//     ]);
-
-const retrieveDocs = RunnableLambda.from(async (question) => {
-    const docs = await retriver.getRelevantDocuments(question);
-    return {
-      docs,
-      context: formatDocs(docs),
-    };
-  });
-
-  const retrivalChain = RunnableSequence.from([
-    {
-      data: retrieveDocs,
-      question: new RunnablePassthrough(),
-    },
-    {
-      context: (input) => input.data.context,
-      sourceDocs: (input) => input.data.docs,
-      question: (input) => input.question,
-    },
-  ]);
-
-    console.log("Checking retrived Data")
-    const retrivedData = await retriver.getRelevantDocuments("Who is Shailesh");
-    console.log("Retrived data finish");
-
+    const retrivalChain = RunnablePassthrough.assign({
+        sourceDocs: (input) => retriver.invoke(input.question)
+    }).assign({
+        context: (input) => formatDocuments(input.sourceDocs)
+    })
     const generationChain = RunnableSequence.from([
         (input) => ({ context: input.context, question: input.question }),
         prompt,
@@ -217,21 +186,3 @@ const retrieveDocs = RunnableLambda.from(async (question) => {
     return { retrivalChain, generationChain, extractSources }
 }
 
-
-
-// const retrivalChain = RunnableSequence.from([
-//     // {
-//     //     context: retriever.pipe(formatDocs),
-//     //     question: new RunnablePassthrough(),
-//     //     source: retriever
-//     // }
-//    {
-//     context: retriever.pipe(formatDocs),
-//     context: retriever.pipe(
-//         new RunnableLambda({
-//             func: formatDocs,
-//         })
-//     ),
-//     question: new RunnablePassthrough(),
-// }
-// ])
